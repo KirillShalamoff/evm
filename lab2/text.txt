@@ -1,0 +1,1 @@
+gcc -O0 program.c -o program00 && gcc -O1 program.c -o program01 && gcc -O2 program.c -o program02 && gcc -O3 program.c -o program03 && gcc -Og program.c -o program0g && gcc -Os program.c -o program0s && gcc -Ofast program.c -o program0fast
