@@ -1,0 +1,1 @@
+g++ -o usb_scanner usb_scanner.cpp -lusb-1.0
