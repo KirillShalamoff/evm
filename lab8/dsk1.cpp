@@ -27,11 +27,11 @@ void initialize_array(vector<int>& arr, const string& mode) {
     else if (mode == "random") {
         vector<int> permutation(n);
         iota(permutation.begin(), permutation.end(), 0);
-
+        
         random_device rd;
         mt19937 gen(rd());
         shuffle(permutation.begin(), permutation.end(), gen);
-
+        
         for (int i = 0; i < n - 1; ++i) {
             arr[permutation[i]] = permutation[i + 1];
         }
@@ -39,53 +39,38 @@ void initialize_array(vector<int>& arr, const string& mode) {
     }
 }
 
-double measure_access_time(const vector<int>& arr, int iterations) {
+uint64_t measure_min_access_time(const vector<int>& arr, int iterations) {
     int n = arr.size();
     volatile int k = 0;
-
-    // ТОЛЬКО ПРОГРЕВ без сохранения в кэше измеряемых данных
-    vector<int> warmup_array(n);
-    initialize_array(warmup_array, "direct");
-    for (int i = 0; i < n; ++i) {
-        k = warmup_array[k];
+    uint64_t min_cycles = ULLONG_MAX;
+    
+    // Прогрев кэша
+    for (int i = 0; i < n * 10; ++i) {
+        k = arr[k];
     }
-
-    uint64_t total_min = UINT64_MAX;
-    const int steps = 100000;
-
+    
     for (int iter = 0; iter < iterations; iter++) {
         k = 0;
         
-        // СБРОС КЭША ПЕРЕД КАЖДЫМ ИЗМЕРЕНИЕМ
-        const int FLUSH_SIZE = 8 * 1024 * 1024; // 8MB
-        vector<char> flush_array(FLUSH_SIZE);
-        for (int i = 0; i < FLUSH_SIZE; i += 64) {
-            _mm_clflush(&flush_array[i]);
+        // Измеряем время одного полного прохода по списку
+        uint64_t start = __rdtsc();
+        
+        for (int i = 0; i < n; i++) {
+            k = arr[k];
         }
         
-        // Измеряем время ПЕРВЫХ обращений
-        for (int i = 0; i < steps; i++) {
-            // Частый сброс для предотвращения предвыборки
-            if (i % 16 == 0) {
-                asm volatile("" ::: "memory"); // Барьер памяти
-            }
-            
-            uint64_t start = __rdtsc();
-            _mm_mfence();
-            k = arr[k];
-            _mm_mfence();
-            uint64_t end = __rdtsc();
-            
-            uint64_t total = (end - start);
-            if (total < total_min) {
-                total_min = total;
-            }
+        uint64_t end = __rdtsc();
+        uint64_t cycles_per_element = (end - start) / n;
+        
+        if (cycles_per_element < min_cycles) {
+            min_cycles = cycles_per_element;
         }
-
+        
+        // Предотвращаем оптимизацию
         asm volatile("" : "+r" (k));
     }
-
-    return total_min;
+    
+    return min_cycles;
 }
 
 int main(int argc, char* argv[]) {
@@ -93,33 +78,33 @@ int main(int argc, char* argv[]) {
         cerr << "Usage: " << argv[0] << " <iterations>" << endl;
         return 1;
     }
-
+    
     int iterations = stoi(argv[1]);
-
+    
     cout << "Size(Bytes)\tDirect\tReverse\tRandom" << endl;
-
     int i = 0;
     for (int size_bytes = MIN_CACHE_SIZE; size_bytes <= MAX_CACHE_SIZE; size_bytes += 256 * i) {
-        i ++;
         int size_elements = size_bytes / sizeof(int);
-
+        i++;
         if (size_elements < 1) continue;
-
+        
         vector<int> arr(size_elements);
-
+        
         cout << size_bytes << ": ";
-
+        
         // Прямой обход
         initialize_array(arr, "direct");
-        cout << measure_access_time(arr, iterations) << " ";
-
+        cout << measure_min_access_time(arr, iterations) << " ";
+        
         // Обратный обход
         initialize_array(arr, "reverse");
-        cout << measure_access_time(arr, iterations) << " ";
-
+        cout << measure_min_access_time(arr, iterations) << " ";
+        
         // Случайный обход
         initialize_array(arr, "random");
-        cout << measure_access_time(arr, iterations) << endl;
+        cout << measure_min_access_time(arr, iterations) << endl;
     }
+    
     return 0;
 }
+
