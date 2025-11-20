@@ -3,7 +3,7 @@
 #include <limits.h>
 #include <iomanip>
 
-const size_t L3_SIZE = 24 * 1024 * 1024;
+const size_t L3_SIZE = 12 * 1024 * 1024;
 const size_t L3_ARR_SIZE = L3_SIZE / sizeof(int);
 
 using namespace std;
@@ -57,25 +57,12 @@ size_t measure_access_time(int* array, int array_size, int num_fragments, int it
 	return min_duration;
 }
 
-void print_logic() {
-    cout << endl;
-    cout << "                        L3_ARR_SIZE * 32                    " << endl;
-    cout << " <--------------------------------------------------------> " << endl;
-    cout << " L3_ARR_SIZE" << endl;
-    cout << " <-------->" << endl;
-    cout << "||   |     |          |          |          |...|          |" << endl;
-    cout << "  <->" << endl;
-    cout << "   ^" << endl;
-    cout << " L3_ARR_SIZE / num_fragments" << endl;
-    cout << endl;
-}
 
 int main() {
     int iterations;
     cout << "Введите кол-во итераций: ";
     cin >> iterations;
 
-    print_logic();
 
     size_t array_size = L3_ARR_SIZE * 32;
 
