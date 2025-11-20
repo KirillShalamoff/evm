@@ -43,49 +43,31 @@ double measure_access_time(const vector<int>& arr, int iterations) {
     int n = arr.size();
     volatile int k = 0;
 
-    // ТОЛЬКО ПРОГРЕВ без сохранения в кэше измеряемых данных
-    vector<int> warmup_array(n);
-    initialize_array(warmup_array, "direct");
-    for (int i = 0; i < n; ++i) {
-        k = warmup_array[k];
+    // рогрев кэша - многократный проход
+    for (int i = 0; i < n * 10; ++i) {
+        k = arr[k];
     }
 
-    uint64_t total_min = UINT64_MAX;
-    const int steps = 100000;
+    uint64_t total_cycles = 0;
+    const int steps = 1000000; // Фиксированное количество шагов
 
     for (int iter = 0; iter < iterations; iter++) {
         k = 0;
-        
-        // СБРОС КЭША ПЕРЕД КАЖДЫМ ИЗМЕРЕНИЕМ
-        const int FLUSH_SIZE = 8 * 1024 * 1024; // 8MB
-        vector<char> flush_array(FLUSH_SIZE);
-        for (int i = 0; i < FLUSH_SIZE; i += 64) {
-            _mm_clflush(&flush_array[i]);
-        }
-        
-        // Измеряем время ПЕРВЫХ обращений
+        uint64_t start = __rdtsc();
+
+        // Измеряем время множественных обращений
         for (int i = 0; i < steps; i++) {
-            // Частый сброс для предотвращения предвыборки
-            if (i % 16 == 0) {
-                asm volatile("" ::: "memory"); // Барьер памяти
-            }
-            
-            uint64_t start = __rdtsc();
-            _mm_mfence();
             k = arr[k];
-            _mm_mfence();
-            uint64_t end = __rdtsc();
-            
-            uint64_t total = (end - start);
-            if (total < total_min) {
-                total_min = total;
-            }
         }
 
+        uint64_t end = __rdtsc();
+        total_cycles += (end - start);
+
+        // Предотвращаем оптимизацию
         asm volatile("" : "+r" (k));
     }
 
-    return total_min;
+    return (int)total_cycles / (iterations * steps);
 }
 
 int main(int argc, char* argv[]) {
@@ -123,3 +105,4 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
+
